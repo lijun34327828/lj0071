@@ -12,6 +12,8 @@ import {
   Phone,
   User,
   Venus,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 
 type Gender = 'male' | 'female' | 'other';
@@ -19,7 +21,7 @@ type Gender = 'male' | 'female' | 'other';
 type TabKey = 'register' | 'checkin';
 
 export default function Home() {
-  const { packages, loadPackages, createMember, searchMemberByPhone, doCheckin, showToast } =
+  const { packages, loadPackages, createMember, renewMember, searchMemberByPhone, doCheckin, showToast } =
     useAppStore();
 
   const [activeTab, setActiveTab] = useState<TabKey>('register');
@@ -36,6 +38,11 @@ export default function Home() {
   const [foundMember, setFoundMember] = useState<Member | null>(null);
   const [searching, setSearching] = useState(false);
   const [checkinLoading, setCheckinLoading] = useState(false);
+
+  // 续卡
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [renewPackageId, setRenewPackageId] = useState<string>('');
+  const [renewLoading, setRenewLoading] = useState(false);
 
   useEffect(() => {
     loadPackages();
@@ -109,6 +116,24 @@ export default function Home() {
       }
     } finally {
       setCheckinLoading(false);
+    }
+  }
+
+  async function handleRenew() {
+    if (!foundMember || !renewPackageId) return;
+    setRenewLoading(true);
+    try {
+      const member = await renewMember({
+        memberId: foundMember.id,
+        packageId: renewPackageId,
+      });
+      setFoundMember(member);
+      setShowRenewModal(false);
+      setRenewPackageId('');
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : '续卡失败');
+    } finally {
+      setRenewLoading(false);
     }
   }
 
@@ -395,28 +420,41 @@ export default function Home() {
                   </div>
                 </div>
 
-                <button
-                  onClick={handleCheckin}
-                  disabled={
-                    checkinLoading ||
-                    foundMember.remainingHours <= 0 ||
-                    isTodayExpired(foundMember.expireDate)
-                  }
-                  className="gym-btn-success w-full py-3 text-base font-semibold flex items-center justify-center gap-2"
-                >
-                  {checkinLoading ? (
-                    <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Zap className="w-5 h-5" />
-                      {foundMember.remainingHours <= 0
-                        ? '课时已用完'
-                        : isTodayExpired(foundMember.expireDate)
-                          ? '卡片已过期'
-                          : '确认核销本次课程'}
-                    </>
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCheckin}
+                    disabled={
+                      checkinLoading ||
+                      foundMember.remainingHours <= 0 ||
+                      isTodayExpired(foundMember.expireDate)
+                    }
+                    className="gym-btn-success flex-1 py-3 text-base font-semibold flex items-center justify-center gap-2"
+                  >
+                    {checkinLoading ? (
+                      <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5" />
+                        {foundMember.remainingHours <= 0
+                          ? '课时已用完'
+                          : isTodayExpired(foundMember.expireDate)
+                            ? '卡片已过期'
+                            : '核销课程'}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRenewModal(true);
+                      setRenewPackageId('');
+                    }}
+                    disabled={renewLoading}
+                    className="gym-btn-secondary flex-1 py-3 text-base font-semibold flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    续卡
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="text-center py-12 text-gym-textLight">
@@ -424,6 +462,97 @@ export default function Home() {
                 <p className="text-sm">请先输入手机号查询会员</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showRenewModal && foundMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 animate-fade-in-up">
+            <div className="flex items-center justify-between p-5 border-b border-gym-border">
+              <h3 className="font-display text-lg font-bold text-gym-navy flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-gym-orange" />
+                会员续卡
+              </h3>
+              <button
+                onClick={() => setShowRenewModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-gym-bg flex items-center justify-center text-gym-textLight hover:text-gym-text transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="bg-gym-bg/50 rounded-xl p-4 mb-5">
+                <p className="font-semibold text-gym-navy">{foundMember.name}</p>
+                <p className="text-sm text-gym-textLight">{foundMember.phone}</p>
+                <div className="flex gap-4 mt-2 text-sm">
+                  <span className="text-gym-textLight">
+                    当前剩余：<span className="font-semibold text-gym-navy">{foundMember.remainingHours} 课时</span>
+                  </span>
+                  <span className="text-gym-textLight">
+                    到期日：<span className="font-semibold text-gym-navy">{foundMember.expireDate}</span>
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm font-semibold text-gym-textLight mb-3">选择续卡套餐</p>
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                {packages.map((pkg) => (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => setRenewPackageId(pkg.id)}
+                    className={`w-full text-left rounded-xl p-4 border-2 transition-all duration-200 ${
+                      renewPackageId === pkg.id
+                        ? 'border-gym-orange bg-gym-orange/5'
+                        : 'border-gym-border bg-white hover:border-gym-orange/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h5 className="font-bold text-gym-navy">{pkg.name}</h5>
+                        <p className="text-sm text-gym-textLight">
+                          {pkg.hours} 课时 · {pkg.durationDays} 天有效
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display font-bold text-2xl text-gym-orange">
+                          ¥{pkg.price}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 p-5 border-t border-gym-border">
+              <button
+                onClick={() => setShowRenewModal(false)}
+                disabled={renewLoading}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gym-border text-gym-text hover:border-gym-orange hover:text-gym-orange transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleRenew}
+                disabled={renewLoading || !renewPackageId}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gym-orange text-white hover:bg-gym-orange/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              >
+                {renewLoading ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    续卡中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    确认续卡
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

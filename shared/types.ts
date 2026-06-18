@@ -1,3 +1,5 @@
+export type TransactionType = 'register' | 'renew' | 'checkin';
+
 export interface Member {
   id: number;
   name: string;
@@ -19,6 +21,17 @@ export interface CheckinRecord {
   remainingAfter: number;
 }
 
+export interface TransactionRecord {
+  id: number;
+  memberId: number;
+  memberName: string;
+  type: TransactionType;
+  changeHours: number;
+  remainingAfter: number;
+  packageName: string;
+  createdAt: string;
+}
+
 export interface Package {
   id: string;
   name: string;
@@ -32,6 +45,11 @@ export interface CreateMemberRequest {
   name: string;
   phone: string;
   gender: 'male' | 'female' | 'other';
+  packageId: string;
+}
+
+export interface RenewMemberRequest {
+  memberId: number;
   packageId: string;
 }
 
@@ -55,4 +73,6 @@ export interface MemberStats {
   active: number;
   zeroHours: number;
   expired: number;
+  todayRenewCount: number;
+  todayCheckinCount: number;
 }

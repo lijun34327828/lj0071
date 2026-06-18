@@ -40,8 +40,23 @@ db.exec(`
     FOREIGN KEY (member_id) REFERENCES members(id)
   );
 
+  CREATE TABLE IF NOT EXISTS transaction_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    member_name VARCHAR(50) NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    change_hours INTEGER NOT NULL DEFAULT 0,
+    remaining_after INTEGER NOT NULL,
+    package_name VARCHAR(50) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_members_phone ON members(phone);
   CREATE INDEX IF NOT EXISTS idx_checkin_member ON checkin_records(member_id);
+  CREATE INDEX IF NOT EXISTS idx_transaction_member ON transaction_records(member_id);
+  CREATE INDEX IF NOT EXISTS idx_transaction_type ON transaction_records(type);
+  CREATE INDEX IF NOT EXISTS idx_transaction_created ON transaction_records(created_at);
 `);
 
 export default db;

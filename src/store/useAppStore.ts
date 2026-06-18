@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Member, Package, CheckinRecord, MemberStats } from '../../shared/types.js';
+import type { Member, Package, CheckinRecord, TransactionRecord, MemberStats } from '../../shared/types.js';
 import { api } from '@/services/api';
 
 interface Toast {
@@ -14,6 +14,7 @@ interface AppState {
   memberTotal: number;
   memberStats: MemberStats;
   checkinRecords: CheckinRecord[];
+  transactionRecords: TransactionRecord[];
   toasts: Toast[];
 
   loadPackages: () => Promise<void>;
@@ -21,8 +22,10 @@ interface AppState {
   loadMemberStats: () => Promise<void>;
   searchMemberByPhone: (phone: string) => Promise<Member | null>;
   createMember: (data: { name: string; phone: string; gender: Member['gender']; packageId: string }) => Promise<Member>;
+  renewMember: (data: { memberId: number; packageId: string }) => Promise<Member>;
   doCheckin: (memberId: number) => Promise<{ success: boolean; message: string; remainingHours: number }>;
   loadCheckinRecords: (memberId?: number) => Promise<void>;
+  loadTransactionRecords: (memberId?: number) => Promise<void>;
 
   showToast: (type: Toast['type'], message: string) => void;
   removeToast: (id: number) => void;
@@ -34,8 +37,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   packages: [],
   members: [],
   memberTotal: 0,
-  memberStats: { total: 0, active: 0, zeroHours: 0, expired: 0 },
+  memberStats: { total: 0, active: 0, zeroHours: 0, expired: 0, todayRenewCount: 0, todayCheckinCount: 0 },
   checkinRecords: [],
+  transactionRecords: [],
   toasts: [],
 
   loadPackages: async () => {
@@ -63,6 +67,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     return member;
   },
 
+  renewMember: async (data) => {
+    const member = await api.renewMember(data);
+    get().showToast('success', `会员 ${member.name} 续卡成功！`);
+    return member;
+  },
+
   doCheckin: async (memberId: number) => {
     const result = await api.checkin(memberId);
     if (result.success) {
@@ -76,6 +86,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadCheckinRecords: async (memberId) => {
     const records = await api.getCheckinRecords(memberId);
     set({ checkinRecords: records });
+  },
+
+  loadTransactionRecords: async (memberId) => {
+    const records = await api.getTransactionRecords(memberId);
+    set({ transactionRecords: records });
   },
 
   showToast: (type, message) => {

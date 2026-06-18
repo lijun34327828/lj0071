@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import type { Member, CheckinRecord } from '../../shared/types.js';
+import type { Member, CheckinRecord, TransactionRecord } from '../../shared/types.js';
 import {
   Users,
   Search,
@@ -15,6 +15,10 @@ import {
   RotateCcw,
   UserPlus,
   History,
+  RefreshCw,
+  Zap,
+  List,
+  Filter,
 } from 'lucide-react';
 
 function isExpired(expireDate: string): boolean {
@@ -22,8 +26,26 @@ function isExpired(expireDate: string): boolean {
   return expireDate < today;
 }
 
+function getTypeLabel(type: string): string {
+  switch (type) {
+    case 'register': return '办卡';
+    case 'renew': return '续卡';
+    case 'checkin': return '核销';
+    default: return type;
+  }
+}
+
+function getTypeColor(type: string): string {
+  switch (type) {
+    case 'register': return 'bg-gym-navy/10 text-gym-navy';
+    case 'renew': return 'bg-emerald-100 text-emerald-700';
+    case 'checkin': return 'bg-gym-orange/10 text-gym-orange';
+    default: return 'bg-gray-100 text-gray-700';
+  }
+}
+
 export default function Admin() {
-  const { members, memberTotal, memberStats, checkinRecords, loadMembers, loadMemberStats, loadCheckinRecords, doCheckin, createMember, showToast } =
+  const { members, memberTotal, memberStats, checkinRecords, transactionRecords, loadMembers, loadMemberStats, loadCheckinRecords, loadTransactionRecords, doCheckin, createMember, showToast } =
     useAppStore();
 
   const [page, setPage] = useState(1);
@@ -42,11 +64,19 @@ export default function Admin() {
   const [checkinCount, setCheckinCount] = useState<number>(5);
   const [batchCheckinLoading, setBatchCheckinLoading] = useState(false);
 
+  // 流水筛选
+  const [transactionMemberFilter, setTransactionMemberFilter] = useState<number | null>(null);
+
   const refresh = useCallback(() => {
     loadMembers(page, pageSize, searchDebounce);
     loadMemberStats();
     loadCheckinRecords();
-  }, [loadMembers, loadMemberStats, loadCheckinRecords, page, pageSize, searchDebounce]);
+    loadTransactionRecords(transactionMemberFilter ?? undefined);
+  }, [loadMembers, loadMemberStats, loadCheckinRecords, loadTransactionRecords, page, pageSize, searchDebounce, transactionMemberFilter]);
+
+  useEffect(() => {
+    loadTransactionRecords(transactionMemberFilter ?? undefined);
+  }, [loadTransactionRecords, transactionMemberFilter]);
 
   useEffect(() => {
     refresh();
@@ -144,7 +174,7 @@ export default function Admin() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid md:grid-cols-4 gap-4 mb-6">
+      <div className="grid md:grid-cols-3 gap-4 mb-4">
         <StatCard
           label="会员总数"
           value={memberStats.total}
@@ -166,12 +196,28 @@ export default function Admin() {
           color="from-gym-danger to-red-600"
           delay={100}
         />
+      </div>
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
         <StatCard
           label="已过期卡片"
           value={memberStats.expired}
           icon={<AlertTriangle className="w-5 h-5" />}
           color="from-gym-warning to-amber-600"
           delay={150}
+        />
+        <StatCard
+          label="今日续卡笔数"
+          value={memberStats.todayRenewCount}
+          icon={<RefreshCw className="w-5 h-5" />}
+          color="from-emerald-500 to-teal-600"
+          delay={200}
+        />
+        <StatCard
+          label="今日核销笔数"
+          value={memberStats.todayCheckinCount}
+          icon={<Zap className="w-5 h-5" />}
+          color="from-gym-orange to-orange-600"
+          delay={250}
         />
       </div>
 
@@ -434,6 +480,59 @@ export default function Admin() {
           </table>
         </div>
       </div>
+
+      {/* 课时变动流水 */}
+      <div className="gym-card mt-6 animate-fade-in-up" style={{ animationDelay: '250ms' }}>
+        <div className="p-5 border-b border-gym-border flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="font-display text-lg font-bold text-gym-navy flex items-center gap-2">
+            <List className="w-5 h-5 text-gym-orange" />
+            课时变动流水
+          </h3>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gym-textLight" />
+            <select
+              className="gym-input text-sm py-2 px-3"
+              value={transactionMemberFilter ?? ''}
+              onChange={(e) => setTransactionMemberFilter(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">全部会员</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.phone})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gym-bg/60">
+              <tr>
+                <th className="text-left px-5 py-3 font-semibold text-gym-textLight">时间</th>
+                <th className="text-left px-5 py-3 font-semibold text-gym-textLight">会员</th>
+                <th className="text-left px-5 py-3 font-semibold text-gym-textLight">类型</th>
+                <th className="text-left px-5 py-3 font-semibold text-gym-textLight">套餐</th>
+                <th className="text-right px-5 py-3 font-semibold text-gym-textLight">变动课时</th>
+                <th className="text-right px-5 py-3 font-semibold text-gym-textLight">变动后剩余</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactionRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-gym-textLight">
+                    <List className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p>暂无流水记录</p>
+                  </td>
+                </tr>
+              ) : (
+                transactionRecords.slice(0, 20).map((r) => (
+                  <TransactionRow key={r.id} record={r} />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -600,6 +699,31 @@ function CheckinRow({ record }: { record: CheckinRecord }) {
         >
           {record.remainingAfter} 课时
         </span>
+      </td>
+    </tr>
+  );
+}
+
+function TransactionRow({ record }: { record: TransactionRecord }) {
+  const isPositive = record.changeHours > 0;
+  return (
+    <tr className="border-t border-gym-border hover:bg-gym-bg/40 transition-colors">
+      <td className="px-5 py-3 text-sm text-gym-textLight">{record.createdAt}</td>
+      <td className="px-5 py-3 text-sm font-medium text-gym-text">{record.memberName}</td>
+      <td className="px-5 py-3">
+        <span className={`gym-badge ${getTypeColor(record.type)}`}>
+          {getTypeLabel(record.type)}
+        </span>
+      </td>
+      <td className="px-5 py-3 text-sm text-gym-text">{record.packageName}</td>
+      <td className="px-5 py-3 text-right">
+        <span className={`font-semibold text-base ${isPositive ? 'text-gym-success' : 'text-gym-danger'}`}>
+          {isPositive ? '+' : ''}{record.changeHours}
+        </span>
+      </td>
+      <td className="px-5 py-3 text-right">
+        <span className="font-semibold text-base text-gym-navy">{record.remainingAfter}</span>
+        <span className="text-sm text-gym-textLight ml-1">课时</span>
       </td>
     </tr>
   );

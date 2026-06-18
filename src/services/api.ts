@@ -2,7 +2,9 @@ import type {
   Member,
   Package,
   CheckinRecord,
+  TransactionRecord,
   CreateMemberRequest,
+  RenewMemberRequest,
   CheckinResponse,
   MemberListResponse,
   MemberStats,
@@ -29,6 +31,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  renewMember: (data: RenewMemberRequest) =>
+    request<Member>('/api/members/renew', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getMembers: (page = 1, pageSize = 10, keyword = '') =>
     request<MemberListResponse>(
       `/api/members?page=${page}&pageSize=${pageSize}&keyword=${encodeURIComponent(keyword)}`,
@@ -46,6 +54,11 @@ export const api = {
   getCheckinRecords: (memberId?: number) =>
     request<CheckinRecord[]>(
       memberId ? `/api/checkin-records?memberId=${memberId}` : '/api/checkin-records',
+    ),
+
+  getTransactionRecords: (memberId?: number) =>
+    request<TransactionRecord[]>(
+      memberId ? `/api/transaction-records?memberId=${memberId}` : '/api/transaction-records',
     ),
 
   getMemberStats: () => request<MemberStats>('/api/members/stats'),

@@ -2,13 +2,15 @@ import { Request, Response } from 'express';
 import { PACKAGES } from '../config/packages.js';
 import {
   createMember,
+  renewMember,
   getMemberList,
   getMemberByPhone,
   checkinMember,
   getCheckinRecords,
+  getTransactionRecords,
   getMemberStats,
 } from '../services/memberService.js';
-import type { CreateMemberRequest } from '../../shared/types.js';
+import type { CreateMemberRequest, RenewMemberRequest } from '../../shared/types.js';
 
 export function getPackages(_req: Request, res: Response) {
   res.json(PACKAGES);
@@ -26,6 +28,22 @@ export function registerMember(req: Request, res: Response) {
   } catch (err) {
     console.error('[registerMember]', err);
     const message = err instanceof Error ? err.message : '创建会员失败';
+    res.status(400).json({ error: message });
+  }
+}
+
+export function renewMemberController(req: Request, res: Response) {
+  try {
+    const { memberId, packageId } = req.body as RenewMemberRequest;
+    if (!memberId || !packageId) {
+      res.status(400).json({ error: '缺少必填参数' });
+      return;
+    }
+    const member = renewMember(memberId, packageId);
+    res.json(member);
+  } catch (err) {
+    console.error('[renewMember]', err);
+    const message = err instanceof Error ? err.message : '续卡失败';
     res.status(400).json({ error: message });
   }
 }
@@ -77,6 +95,17 @@ export function listCheckinRecords(req: Request, res: Response) {
   } catch (err) {
     console.error('[listCheckinRecords]', err);
     res.status(500).json({ error: err instanceof Error ? err.message : '查询核销记录失败' });
+  }
+}
+
+export function listTransactionRecords(req: Request, res: Response) {
+  try {
+    const memberId = req.query.memberId ? Number(req.query.memberId) : undefined;
+    const records = getTransactionRecords(memberId);
+    res.json(records);
+  } catch (err) {
+    console.error('[listTransactionRecords]', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : '查询流水记录失败' });
   }
 }
 

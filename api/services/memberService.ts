@@ -1,5 +1,5 @@
 import db from '../db/index.js';
-import type { Member, CheckinRecord, MemberListResponse, MemberStats } from '../../shared/types.js';
+import type { Member, CheckinRecord, TransactionRecord, MemberListResponse, MemberStats, TransactionType } from '../../shared/types.js';
 import { getPackageById, formatDate } from '../config/packages.js';
 
 interface MemberRow {
@@ -12,6 +12,17 @@ interface MemberRow {
   card_type: string;
   card_package: string;
   expire_date: string;
+  created_at: string;
+}
+
+interface TransactionRow {
+  id: number;
+  member_id: number;
+  member_name: string;
+  type: string;
+  change_hours: number;
+  remaining_after: number;
+  package_name: string;
   created_at: string;
 }
 
@@ -28,6 +39,33 @@ function mapMemberRow(row: MemberRow): Member {
     expireDate: row.expire_date,
     createdAt: row.created_at,
   };
+}
+
+function mapTransactionRow(row: TransactionRow): TransactionRecord {
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    memberName: row.member_name,
+    type: row.type as TransactionType,
+    changeHours: row.change_hours,
+    remainingAfter: row.remaining_after,
+    packageName: row.package_name,
+    createdAt: row.created_at,
+  };
+}
+
+function createTransactionRecord(
+  memberId: number,
+  memberName: string,
+  type: TransactionType,
+  changeHours: number,
+  remainingAfter: number,
+  packageName: string,
+): void {
+  db.prepare(`
+    INSERT INTO transaction_records (member_id, member_name, type, change_hours, remaining_after, package_name)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(memberId, memberName, type, changeHours, remainingAfter, packageName);
 }
 
 export function createMember(
@@ -64,7 +102,42 @@ export function createMember(
     formatDate(expireDate),
   );
 
-  const row = db.prepare('SELECT * FROM members WHERE id = ?').get(result.lastInsertRowid) as MemberRow;
+  const memberId = Number(result.lastInsertRowid);
+  createTransactionRecord(memberId, name, 'register', pkg.hours, pkg.hours, pkg.name);
+
+  const row = db.prepare('SELECT * FROM members WHERE id = ?').get(memberId) as MemberRow;
+  return mapMemberRow(row);
+}
+
+export function renewMember(memberId: number, packageId: string): Member {
+  const member = getMemberById(memberId);
+  if (!member) {
+    throw new Error('会员不存在');
+  }
+
+  const pkg = getPackageById(packageId);
+  if (!pkg) {
+    throw new Error('套餐不存在');
+  }
+
+  const newRemaining = member.remainingHours + pkg.hours;
+  const newTotal = member.totalHours + pkg.hours;
+
+  const today = new Date();
+  const currentExpireDate = new Date(member.expireDate);
+  const baseDate = currentExpireDate > today ? currentExpireDate : today;
+  baseDate.setDate(baseDate.getDate() + pkg.durationDays);
+  const newExpireDate = formatDate(baseDate);
+
+  db.prepare(`
+    UPDATE members 
+    SET total_hours = ?, remaining_hours = ?, card_type = ?, card_package = ?, expire_date = ?
+    WHERE id = ?
+  `).run(newTotal, newRemaining, pkg.type, pkg.name, newExpireDate, memberId);
+
+  createTransactionRecord(memberId, member.name, 'renew', pkg.hours, newRemaining, pkg.name);
+
+  const row = db.prepare('SELECT * FROM members WHERE id = ?').get(memberId) as MemberRow;
   return mapMemberRow(row);
 }
 
@@ -136,6 +209,8 @@ export function checkinMember(memberId: number): CheckinResult {
     'INSERT INTO checkin_records (member_id, member_name, remaining_after) VALUES (?, ?, ?)',
   ).run(memberId, member.name, newRemaining);
 
+  createTransactionRecord(memberId, member.name, 'checkin', -1, newRemaining, member.cardPackage);
+
   return {
     success: true,
     message: `核销成功，剩余课时：${newRemaining}`,
@@ -161,11 +236,39 @@ export function getCheckinRecords(memberId?: number): CheckinRecord[] {
   }));
 }
 
+export function getTransactionRecords(memberId?: number): TransactionRecord[] {
+  let rows: TransactionRow[];
+  if (memberId) {
+    rows = db
+      .prepare('SELECT * FROM transaction_records WHERE member_id = ? ORDER BY created_at DESC')
+      .all(memberId) as TransactionRow[];
+  } else {
+    rows = db.prepare('SELECT * FROM transaction_records ORDER BY created_at DESC LIMIT 100').all() as TransactionRow[];
+  }
+  return rows.map(mapTransactionRow);
+}
+
 export function getMemberStats(): MemberStats {
   const today = formatDate(new Date());
   const total = (db.prepare('SELECT COUNT(*) as cnt FROM members').get() as { cnt: number }).cnt;
   const active = (db.prepare('SELECT COUNT(*) as cnt FROM members WHERE expire_date >= ? AND remaining_hours > 0').get(today) as { cnt: number }).cnt;
   const zeroHours = (db.prepare('SELECT COUNT(*) as cnt FROM members WHERE remaining_hours <= 0').get() as { cnt: number }).cnt;
   const expired = (db.prepare('SELECT COUNT(*) as cnt FROM members WHERE expire_date < ?').get(today) as { cnt: number }).cnt;
-  return { total, active, zeroHours, expired };
+
+  const todayStart = `${today} 00:00:00`;
+  const todayEnd = `${today} 23:59:59`;
+
+  const todayRenewCount = (
+    db.prepare(
+      'SELECT COUNT(*) as cnt FROM transaction_records WHERE type = ? AND created_at BETWEEN ? AND ?',
+    ).get('renew', todayStart, todayEnd) as { cnt: number }
+  ).cnt;
+
+  const todayCheckinCount = (
+    db.prepare(
+      'SELECT COUNT(*) as cnt FROM transaction_records WHERE type = ? AND created_at BETWEEN ? AND ?',
+    ).get('checkin', todayStart, todayEnd) as { cnt: number }
+  ).cnt;
+
+  return { total, active, zeroHours, expired, todayRenewCount, todayCheckinCount };
 }
