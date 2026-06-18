@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Noto Sans SC', 'Poppins', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1f2937;
+  background: #f5f7fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e6ecf5 100%);
+}
+
+@layer components {
+  .gym-input {
+    @apply w-full px-4 py-2.5 rounded-lg border border-gym-border bg-white text-gym-text
+           placeholder:text-gym-textLight focus:outline-none focus:ring-2
+           focus:ring-gym-orange/40 focus:border-gym-orange transition-all duration-200;
+  }
+
+  .gym-label {
+    @apply block text-sm font-medium text-gym-text mb-1.5;
+  }
+
+  .gym-btn {
+    @apply px-5 py-2.5 rounded-lg font-medium transition-all duration-200
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .gym-btn-primary {
+    @apply gym-btn bg-gym-orange text-white hover:bg-gym-orangeLight
+           shadow-md hover:shadow-lg shadow-gym-orange/20;
+  }
+
+  .gym-btn-secondary {
+    @apply gym-btn bg-gym-navy text-white hover:bg-gym-navyDark
+           shadow-md hover:shadow-lg shadow-gym-navy/20;
+  }
+
+  .gym-btn-outline {
+    @apply gym-btn border-2 border-gym-navy text-gym-navy bg-transparent
+           hover:bg-gym-navy hover:text-white;
+  }
+
+  .gym-btn-success {
+    @apply gym-btn bg-gym-success text-white hover:bg-emerald-600
+           shadow-md shadow-gym-success/20;
+  }
+
+  .gym-btn-danger {
+    @apply gym-btn bg-gym-danger text-white hover:bg-red-600
+           shadow-md shadow-gym-danger/20;
+  }
+
+  .gym-card {
+    @apply bg-gym-card rounded-2xl shadow-lg shadow-gym-navy/5
+           border border-gym-border overflow-hidden;
+  }
+
+  .gym-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
