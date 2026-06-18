@@ -5,6 +5,7 @@ import type {
   CreateMemberRequest,
   CheckinResponse,
   MemberListResponse,
+  MemberStats,
 } from '../../shared/types.js';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -46,4 +47,6 @@ export const api = {
     request<CheckinRecord[]>(
       memberId ? `/api/checkin-records?memberId=${memberId}` : '/api/checkin-records',
     ),
+
+  getMemberStats: () => request<MemberStats>('/api/members/stats'),
 };

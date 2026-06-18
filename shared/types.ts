@@ -49,3 +49,10 @@ export interface MemberListResponse {
   list: Member[];
   total: number;
 }
+
+export interface MemberStats {
+  total: number;
+  active: number;
+  zeroHours: number;
+  expired: number;
+}

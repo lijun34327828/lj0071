@@ -1,5 +1,5 @@
 import db from '../db/index.js';
-import type { Member, CheckinRecord, MemberListResponse } from '../../shared/types.js';
+import type { Member, CheckinRecord, MemberListResponse, MemberStats } from '../../shared/types.js';
 import { getPackageById, formatDate } from '../config/packages.js';
 
 interface MemberRow {
@@ -159,4 +159,13 @@ export function getCheckinRecords(memberId?: number): CheckinRecord[] {
     checkinTime: r.checkin_time,
     remainingAfter: r.remaining_after,
   }));
+}
+
+export function getMemberStats(): MemberStats {
+  const today = formatDate(new Date());
+  const total = (db.prepare('SELECT COUNT(*) as cnt FROM members').get() as { cnt: number }).cnt;
+  const active = (db.prepare('SELECT COUNT(*) as cnt FROM members WHERE expire_date >= ? AND remaining_hours > 0').get(today) as { cnt: number }).cnt;
+  const zeroHours = (db.prepare('SELECT COUNT(*) as cnt FROM members WHERE remaining_hours <= 0').get() as { cnt: number }).cnt;
+  const expired = (db.prepare('SELECT COUNT(*) as cnt FROM members WHERE expire_date < ?').get(today) as { cnt: number }).cnt;
+  return { total, active, zeroHours, expired };
 }

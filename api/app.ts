@@ -50,9 +50,11 @@ app.use(
  * error handler middleware
  */
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('[Global Error Handler]', error)
   res.status(500).json({
     success: false,
-    error: 'Server internal error',
+    error: error.message || 'Server internal error',
+    stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined,
   })
 })
 

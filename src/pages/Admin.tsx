@@ -23,7 +23,7 @@ function isExpired(expireDate: string): boolean {
 }
 
 export default function Admin() {
-  const { members, memberTotal, checkinRecords, loadMembers, loadCheckinRecords, doCheckin, createMember, showToast } =
+  const { members, memberTotal, memberStats, checkinRecords, loadMembers, loadMemberStats, loadCheckinRecords, doCheckin, createMember, showToast } =
     useAppStore();
 
   const [page, setPage] = useState(1);
@@ -44,8 +44,9 @@ export default function Admin() {
 
   const refresh = useCallback(() => {
     loadMembers(page, pageSize, searchDebounce);
+    loadMemberStats();
     loadCheckinRecords();
-  }, [loadMembers, loadCheckinRecords, page, pageSize, searchDebounce]);
+  }, [loadMembers, loadMemberStats, loadCheckinRecords, page, pageSize, searchDebounce]);
 
   useEffect(() => {
     refresh();
@@ -146,28 +147,28 @@ export default function Admin() {
       <div className="grid md:grid-cols-4 gap-4 mb-6">
         <StatCard
           label="会员总数"
-          value={memberTotal}
+          value={memberStats.total}
           icon={<Users className="w-5 h-5" />}
           color="from-gym-navy to-gym-navyDark"
           delay={0}
         />
         <StatCard
           label="正常会员"
-          value={members.filter((m) => !isExpired(m.expireDate) && m.remainingHours > 0).length}
+          value={memberStats.active}
           icon={<CheckCircle2 className="w-5 h-5" />}
           color="from-emerald-500 to-emerald-600"
           delay={50}
         />
         <StatCard
           label="课时清零"
-          value={members.filter((m) => m.remainingHours <= 0).length}
+          value={memberStats.zeroHours}
           icon={<XCircle className="w-5 h-5" />}
           color="from-gym-danger to-red-600"
           delay={100}
         />
         <StatCard
           label="已过期卡片"
-          value={members.filter((m) => isExpired(m.expireDate)).length}
+          value={memberStats.expired}
           icon={<AlertTriangle className="w-5 h-5" />}
           color="from-gym-warning to-amber-600"
           delay={150}

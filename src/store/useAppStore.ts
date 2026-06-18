@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Member, Package, CheckinRecord } from '../../shared/types.js';
+import type { Member, Package, CheckinRecord, MemberStats } from '../../shared/types.js';
 import { api } from '@/services/api';
 
 interface Toast {
@@ -12,11 +12,13 @@ interface AppState {
   packages: Package[];
   members: Member[];
   memberTotal: number;
+  memberStats: MemberStats;
   checkinRecords: CheckinRecord[];
   toasts: Toast[];
 
   loadPackages: () => Promise<void>;
   loadMembers: (page?: number, pageSize?: number, keyword?: string) => Promise<void>;
+  loadMemberStats: () => Promise<void>;
   searchMemberByPhone: (phone: string) => Promise<Member | null>;
   createMember: (data: { name: string; phone: string; gender: Member['gender']; packageId: string }) => Promise<Member>;
   doCheckin: (memberId: number) => Promise<{ success: boolean; message: string; remainingHours: number }>;
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   packages: [],
   members: [],
   memberTotal: 0,
+  memberStats: { total: 0, active: 0, zeroHours: 0, expired: 0 },
   checkinRecords: [],
   toasts: [],
 
@@ -43,6 +46,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadMembers: async (page = 1, pageSize = 10, keyword = '') => {
     const result = await api.getMembers(page, pageSize, keyword);
     set({ members: result.list, memberTotal: result.total });
+  },
+
+  loadMemberStats: async () => {
+    const stats = await api.getMemberStats();
+    set({ memberStats: stats });
   },
 
   searchMemberByPhone: async (phone: string) => {
